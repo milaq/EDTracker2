@@ -784,7 +784,7 @@ void blink()
     if (gyroCalibrationPhase)
       lastMillis = nowMillis + 100;
     else
-      lastMillis = nowMillis + 500;
+      lastMillis = nowMillis + 1000;
   }/**/
 }
 
