@@ -110,7 +110,11 @@ extern "C" {
 #define EE_MAGOFFX      40                             // int (2 byte) mag offset for X axis in 9:7 format
 #define EE_MAGOFFY      42                             // int (2 byte) mag offset for Y axis in 9:7 format
 #define EE_MAGOFFZ      44                             // int (2 byte) mag offset for Z axis in 9:7 format
-#define EE_MAGXFORM     50                             // (12 bytes) mag calibration matrix in 6 x 2 byte 2:14 signed format
+#define EE_MAGXFORM     50                             // (36 bytes) mag calibration matrix in 18 x 2 byte 2:14 signed format
+#define EE_GYROBIASX    86                             // long (4 bytes) gyro bias for X axis
+#define EE_GYROBIASY    90                             // long (4 bytes) gyro bias for Y axis
+#define EE_GYROBIASZ    94                             // long (4 bytes) gyro bias for Z axis
+#define EE_STARTUPCALIB 98                             // (1 byte) startup auto gyro calibration (0 - off / 1 - on)
 
 /*
  * Pin defines (assume Sparkfun Pro Micro; change as necessary)
@@ -162,12 +166,12 @@ boolean calibrated = true;
 //Number of samples to take when recalibrating
 byte  recalibrateSamples =  255;
 
+boolean startupGyroCalibration = true;
 long avgGyro[3] ;//= {0, 0, 0};
 long gBias[3];                    // Gyro biases for MPU
 volatile boolean new_gyro ;
-boolean startup = true;           // Flags when we are in the startup (auto-bias) phase (TODO: remove and just use startupPhase for logic)
-int  startupPhase = 0;            // and which type of phase it is
-int  startupSamples;
+int gyroCalibrationPhase = 1;     // Flags in which phase of the gyro calibration (auto-bias) we are (0 -> n/a)
+int gyroCalibrationSamples;
 
 // The "Tracker" object which is used to mimic the joystick; see HID.cpp within the hardware folder
 TrackState_t joySt;
@@ -240,6 +244,12 @@ void setup() {
   initialize_mpu();
   enable_mpu();
 
+  if (!startupGyroCalibration)
+  {
+    gyroCalibrationPhase = 0;
+    loadGyroCalibration();
+    recenter();
+  }
 }
 
 /*******************************************************************************************************
@@ -320,26 +330,25 @@ void loop()
 
       magHeading = wrap(magHeading);
 
-      // Auto Gyro Calibration
-      if (startup)
+      // gyro calibration
+      if (gyroCalibrationPhase)
       {
         blink();
         parseInput();
 
-        if (startupPhase == 0)
+        if (gyroCalibrationPhase == 1)
         {
           for (int n = 0; n < 3; n++)
             gBias[n] = avgGyro[n] = 0;
 
           mpu_set_gyro_bias_reg(gBias);
-          startupPhase = 1;
-          startupSamples = 500;
+          gyroCalibrationPhase = 2;
+          gyroCalibrationSamples = 500;
           return;
         }
-
-        if (startupPhase == 1)
+        else if (gyroCalibrationPhase == 2)
         {
-          if (startupSamples == 0)
+          if (gyroCalibrationSamples == 0)
           {
             for (int n = 0; n < 3; n++)
             {
@@ -347,8 +356,8 @@ void loop()
             }
             xDriftComp = 0.0;
             mpu_set_gyro_bias_reg(gBias);
-            startupPhase = 2;
-            startupSamples = 0;
+            gyroCalibrationPhase = 3;
+            gyroCalibrationSamples = 0;
             lastDriftX = newv[0];
             //return;
           }
@@ -357,20 +366,20 @@ void loop()
             for (int n = 0; n < 3; n++)
               avgGyro[n] += gyro[n];
           }
-          startupSamples --;
+          gyroCalibrationSamples--;
           return ;
         }
-
-        if (startupPhase == 2)
+        else if (gyroCalibrationPhase == 3)
         {
-          if (startupSamples == 1500)
+          if (gyroCalibrationSamples == 1500)
           {
             xDriftComp = (newv[0] - lastDriftX) * 69.53373;
-            startup = false;
+            saveGyroCalibration();
+            gyroCalibrationPhase = 0;
             recenter();
             Serial.println("H"); // Hello
           }
-          startupSamples++;
+          gyroCalibrationSamples++;
           return ;
         }
       }
@@ -452,8 +461,8 @@ void loop()
     } else {
       joySt.xAxis = joySt.xAxis * outputLPF + ii[0] * (1.0 - outputLPF) ;
     }
-      joySt.yAxis = joySt.yAxis * outputLPF + ii[1] * (1.0 - outputLPF) ;
-      joySt.zAxis = joySt.zAxis * outputLPF + ii[2] * (1.0 - outputLPF) ;
+    joySt.yAxis = joySt.yAxis * outputLPF + ii[1] * (1.0 - outputLPF) ;
+    joySt.zAxis = joySt.zAxis * outputLPF + ii[2] * (1.0 - outputLPF) ;
     
     Tracker.setState(&joySt);
 
@@ -572,7 +581,6 @@ void loop()
 
 }
 
-
 /*******************************************************************************************************
 * Serial Input parsing (UI commands) function
 ********************************************************************************************************/
@@ -611,7 +619,7 @@ void parseInput()
     }
     else if (command == 'H')
     {
-      if (startup)
+      if (gyroCalibrationPhase)
         Serial.println("h");
       else
         Serial.println("H"); // Hello
@@ -659,6 +667,12 @@ void parseInput()
     {
       //20 second calibration
       fullCalib();
+    }
+    else if (command == 'A')
+    {
+      // toggle startup gyro auto calibration
+      startupGyroCalibration = !startupGyroCalibration;
+      EEPROM.write(EE_STARTUPCALIB, startupGyroCalibration);
     }
     else if (command == 87) // full wipe
     {
@@ -767,7 +781,7 @@ void blink()
     blinkState = !blinkState;
     digitalWrite(LED_PIN, blinkState);
 
-    if (startup)
+    if (gyroCalibrationPhase)
       lastMillis = nowMillis + 100;
     else
       lastMillis = nowMillis + 500;
@@ -948,13 +962,12 @@ void reportRawMagMatrix()
 }
 
 /*******************************************************************************************************
-* Recenter the device and put it into the startup phase for a full gyro calibration to be performed
+* Recenter the device and put it into the gyro calibration phase for a full gyro calibration to be performed
 ********************************************************************************************************/
 void fullCalib()
 {
   recenter();
-  startupPhase = 0;
-  startup = true;
+  gyroCalibrationPhase = 1;
 }
 
 void printtab()
@@ -979,12 +992,34 @@ void loadMagCalibration()
 }
 
 /*******************************************************************************************************
+* Load gyro calibration from EEPROM
+********************************************************************************************************/
+void loadGyroCalibration()
+{
+  gBias[0] = readLongEE(EE_GYROBIASX);
+  gBias[1] = readLongEE(EE_GYROBIASY);
+  gBias[2] = readLongEE(EE_GYROBIASZ);
+  mpu_set_gyro_bias_reg(gBias);
+}
+
+/*******************************************************************************************************
+* Save gyro calibration to EEPROM
+********************************************************************************************************/
+void saveGyroCalibration()
+{
+  writeLongEE(EE_GYROBIASX, gBias[0]);
+  writeLongEE(EE_GYROBIASY, gBias[1]);
+  writeLongEE(EE_GYROBIASZ, gBias[2]);
+}
+
+/*******************************************************************************************************
 * Wrapper function to do all settings loading - orientation, scaling mode, scaling values and LPF
 * setting
 ********************************************************************************************************/
 void loadSettings()
 {
   orientation = constrain(EEPROM.read(EE_ORIENTATION), 0, 3);
+  startupGyroCalibration = EEPROM.read(EE_STARTUPCALIB);
   expScaleMode = EEPROM.read(EE_EXPSCALEMODE);
   getScales();
   outputLPF = (float)readIntEE(EE_LPF) / 32767.0;
