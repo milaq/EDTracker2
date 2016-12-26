@@ -172,6 +172,7 @@ long gBias[3];                    // Gyro biases for MPU
 volatile boolean new_gyro ;
 int gyroCalibrationPhase = 1;     // Flags in which phase of the gyro calibration (auto-bias) we are (0 -> n/a)
 int gyroCalibrationSamples;
+boolean reportingEnabled = true;  // Flags whether HID reporting is currently enabled
 
 // The "Tracker" object which is used to mimic the joystick; see HID.cpp within the hardware folder
 TrackState_t joySt;
@@ -455,14 +456,20 @@ void loop()
     for (int n = 0; n < 3; n++)
       ii[n] = constrain(ii[n], -32767, 32767);
 
-    // Do it to it (Robspeak for "set the axis values on the HID object"!)
-    if (ii[0] > 30000  || ii[0] < -30000) {
-      joySt.xAxis = ii[0] ;
+    if (reportingEnabled) {
+      // Do it to it (Robspeak for "set the axis values on the HID object"!)
+      if (ii[0] > 30000  || ii[0] < -30000) {
+        joySt.xAxis = ii[0] ;
+      } else {
+        joySt.xAxis = joySt.xAxis * outputLPF + ii[0] * (1.0 - outputLPF) ;
+      }
+      joySt.yAxis = joySt.yAxis * outputLPF + ii[1] * (1.0 - outputLPF) ;
+      joySt.zAxis = joySt.zAxis * outputLPF + ii[2] * (1.0 - outputLPF) ;
     } else {
-      joySt.xAxis = joySt.xAxis * outputLPF + ii[0] * (1.0 - outputLPF) ;
+      joySt.xAxis = 0;
+      joySt.yAxis = 0;
+      joySt.zAxis = 0;
     }
-    joySt.yAxis = joySt.yAxis * outputLPF + ii[1] * (1.0 - outputLPF) ;
-    joySt.zAxis = joySt.zAxis * outputLPF + ii[2] * (1.0 - outputLPF) ;
     
     Tracker.setState(&joySt);
 
@@ -673,6 +680,19 @@ void parseInput()
       // toggle startup gyro auto calibration
       startupGyroCalibration = !startupGyroCalibration;
       EEPROM.write(EE_STARTUPCALIB, startupGyroCalibration);
+    }
+    else if (command == 'e')
+    {
+      // get reporting status
+      if (reportingEnabled)
+        Serial.println("E");
+      else
+        Serial.println("e");
+    }
+    else if (command == 'E')
+    {
+      // toggle reporting
+      reportingEnabled = !reportingEnabled;
     }
     else if (command == 87) // full wipe
     {
