@@ -687,10 +687,10 @@ void blink()
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
 
-        if (gyroCalibrationPhase) {
+        if (gyroCalibrationPhase || !blinkState) {
             lastMillis = nowMillis + 100;
         } else {
-            lastMillis = nowMillis + 1000;
+            lastMillis = nowMillis + 2000;
         }
     }
 }
