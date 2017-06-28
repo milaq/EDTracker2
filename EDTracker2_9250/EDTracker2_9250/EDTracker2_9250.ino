@@ -736,15 +736,6 @@ void tripple(short * v)
     }
 }
 
-/* Convenience function - output a triple array prefixed by a message to serial IO */
-void mess(char * m, long * v)
-{
-    Serial.print(m);
-    Serial.print(v[0]); Serial.print(" / ");
-    Serial.print(v[1]); Serial.print(" / ");
-    Serial.println(v[2]);
-}
-
 /* Get axis scaling from EEPROM */
 void getScales()
 {
