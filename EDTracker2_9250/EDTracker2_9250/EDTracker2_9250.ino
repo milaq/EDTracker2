@@ -599,7 +599,7 @@ void parseInput()
         } else if (command == 'E') {
             /* toggle reporting */
             reportingEnabled = !reportingEnabled;
-        } else if (command == 87) {
+        } else if (command == 'W') {
             /* full wipe */
             byte len, data;
             len = Serial.read();
@@ -615,7 +615,7 @@ void parseInput()
             mpu_set_dmp_state(0);
             dmp_set_orientation(gyro_orients[orientation]);
             mpu_set_dmp_state(1);
-        } else if (command == 36) {
+        } else if (command == '$') {
             /* Mag Calibration Matrix pushed down from UI with orientation applied */
             byte data;
 
