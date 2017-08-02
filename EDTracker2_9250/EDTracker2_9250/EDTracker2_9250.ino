@@ -375,7 +375,7 @@ void loop()
                 }
                 offsetMag = false;
                 recalibrateSamples = 100;  // calibrate next time around
-                if (outputUI ) {
+                if (outputUI) {
                     sendInfo();
                 }
             }
@@ -432,7 +432,7 @@ void loop()
             recenter();
         }
 
-        if (outputUI ) {
+        if (outputUI) {
             Serial.print(joySt.xAxis);
             printtab();
             Serial.print(joySt.yAxis);
@@ -606,7 +606,7 @@ void parseInput()
             for (int i = 0; i < len; i++)
             {
                 data = Serial.read();
-                EEPROM.write( i, data );
+                EEPROM.write(i, data);
             }
 
             loadSettings();
@@ -621,11 +621,11 @@ void parseInput()
 
             for (int i = 0 ; i < 6; i++) {
                 data = Serial.read();
-                EEPROM.write(EE_MAGOFFX + i, data );
+                EEPROM.write(EE_MAGOFFX + i, data);
             }
             for (int i = 0 ; i < 36 ; i++) {  // 18 + 18 is raw mag xform then orientated xform
                 data = Serial.read();
-                EEPROM.write(EE_MAGXFORM + i, data );
+                EEPROM.write(EE_MAGXFORM + i, data);
             }
 
             loadMagCalibration();
@@ -731,7 +731,7 @@ void recenter()
 void tripple(short * v)
 {
     for (int i = 0; i < 3; i++) {
-        Serial.print(v[i] );
+        Serial.print(v[i]);
         printtab();
     }
 }
@@ -816,12 +816,12 @@ void reportRawMagMatrix()
 {
     Serial.print("q\t");
     for (int i = 0; i < 3 ; i++) {
-        Serial.print( magOffset[i], 6);
+        Serial.print(magOffset[i], 6);
         printtab();
     }
     /* raw mag calibration */
     for (int i = 9; i < 18 ; i++) {
-        Serial.print( magXform[i], 13);
+        Serial.print(magXform[i], 13);
         printtab();
     }
     Serial.println("");
