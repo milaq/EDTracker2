@@ -105,7 +105,7 @@ extern "C" {
 #endif
 
 /* version information */
-const char  infoString []   = "EDTrackerMag V4.1.0";
+const char  infoString []   = "EDTrackerMag V4.1.1";
 
 /* Flag for if we're outputting detailed GUI info or not */
 boolean outputUI = false;
