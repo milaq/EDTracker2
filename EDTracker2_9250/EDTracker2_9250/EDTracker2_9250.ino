@@ -586,8 +586,15 @@ void parseInput()
         } else if (command == 'r') {
             /* 20 second calibration */
             fullCalib();
+        } else if (command == 'a') {
+            /* get autocalibration enabled setting */
+            if (startupGyroCalibration) {
+                Serial.println("A");
+            } else {
+                Serial.println("a");
+            }
         } else if (command == 'A') {
-            /* toggle startup gyro auto calibration */
+            /* toggle startup gyro autocalibration */
             startupGyroCalibration = !startupGyroCalibration;
             EEPROM.write(EE_STARTUPCALIB, startupGyroCalibration);
         } else if (command == 'e') {
